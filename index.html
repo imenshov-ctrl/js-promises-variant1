@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FoodOrder — Promise Chains Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg:     #0f1117;
+    --panel:  #181c27;
+    --card:   #1e2335;
+    --border: #252d42;
+    --text:   #e2e8f0;
+    --muted:  #5a6680;
+    --green:  #22c55e;
+    --red:    #ef4444;
+    --yellow: #f59e0b;
+    --blue:   #3b82f6;
+    --purple: #a78bfa;
+    --mono:   'JetBrains Mono', monospace;
+    --sans:   'Inter', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+  /* ── header ── */
+  header {
+    background: linear-gradient(135deg, #1a1f2e 0%, #1e2438 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 24px 40px;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .logo { font-size: 1.6rem; font-weight: 700; letter-spacing: -.5px; }
+  .logo span { color: var(--yellow); }
+  .sub { font-family: var(--mono); font-size: .73rem; color: var(--muted); }
+
+  /* ── layout ── */
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+
+  /* ── order form ── */
+  .order-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    margin-bottom: 28px;
+  }
+  .order-title {
+    font-size: 1rem; font-weight: 600; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .order-title .icon { font-size: 1.2rem; }
+
+  .field-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+  label { font-size: .8rem; color: var(--muted); display: block; margin-bottom: 5px; }
+  input[type=text] {
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: .85rem;
+    padding: 8px 14px; border-radius: 8px; outline: none; width: 200px;
+    transition: border-color .2s;
+  }
+  input[type=text]:focus { border-color: var(--blue); }
+
+  .btn {
+    font-family: var(--sans); font-size: .85rem; font-weight: 600;
+    padding: 9px 22px; border-radius: 8px; border: none; cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: var(--yellow); color: #000; }
+  .btn-primary:hover { opacity: .9; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+  /* ── pipeline steps ── */
+  .pipeline {
+    display: flex; flex-direction: column; gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .step {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 16px;
+    transition: border-color .3s, background .3s;
+  }
+  .step.active  { border-color: var(--blue);   background: rgba(59,130,246,.06); }
+  .step.success { border-color: var(--green);  background: rgba(34,197,94,.06); }
+  .step.error   { border-color: var(--red);    background: rgba(239,68,68,.06); }
+
+  .step-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; flex-shrink: 0;
+    background: var(--card); border: 1px solid var(--border);
+    transition: background .3s, border-color .3s;
+  }
+  .step.active  .step-icon { background: rgba(59,130,246,.15);  border-color: var(--blue); }
+  .step.success .step-icon { background: rgba(34,197,94,.15);   border-color: var(--green); }
+  .step.error   .step-icon { background: rgba(239,68,68,.15);   border-color: var(--red); }
+
+  .step-body { flex: 1; }
+  .step-name { font-size: .88rem; font-weight: 600; margin-bottom: 3px; }
+  .step-desc { font-size: .76rem; color: var(--muted); font-family: var(--mono); }
+
+  .step-status {
+    font-size: .75rem; font-weight: 600; font-family: var(--mono);
+    padding: 3px 10px; border-radius: 5px;
+  }
+  .status-wait    { background: rgba(90,102,128,.15); color: var(--muted); }
+  .status-loading { background: rgba(59,130,246,.15); color: var(--blue);   animation: pulse 1s infinite; }
+  .status-ok      { background: rgba(34,197,94,.15);  color: var(--green); }
+  .status-fail    { background: rgba(239,68,68,.15);  color: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* connector line */
+  .connector {
+    width: 2px; height: 12px; background: var(--border);
+    margin-left: 36px; transition: background .3s;
+  }
+  .connector.done { background: var(--green); }
+
+  /* ── log ── */
+  .log-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .log-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .log-title { font-size: .8rem; font-weight: 600; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .log-body {
+    padding: 16px 20px;
+    font-family: var(--mono); font-size: .76rem;
+    max-height: 280px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .log-line { display: flex; gap: 12px; line-height: 1.5; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-msg  { flex: 1; }
+  .log-info    .log-msg { color: var(--blue); }
+  .log-success .log-msg { color: var(--green); }
+  .log-error   .log-msg { color: var(--red); }
+  .log-warn    .log-msg { color: var(--yellow); }
+  .log-finally .log-msg { color: var(--purple); }
+
+  /* ── result banner ── */
+  .result-banner {
+    border-radius: 12px; padding: 20px 24px;
+    margin-bottom: 24px; display: none;
+    animation: slideIn .3s ease;
+  }
+  .result-banner.show { display: block; }
+  .result-banner.success { background: rgba(34,197,94,.1);  border: 1px solid rgba(34,197,94,.3); }
+  .result-banner.error   { background: rgba(239,68,68,.1);  border: 1px solid rgba(239,68,68,.3); }
+  .result-title { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+  .result-title.success { color: var(--green); }
+  .result-title.error   { color: var(--red); }
+  .result-detail { font-family: var(--mono); font-size: .78rem; color: var(--muted); line-height: 1.8; }
+  @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }
+
+  /* ── timer ── */
+  .timer { font-family: var(--mono); font-size: .8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Food<span>Order</span></div>
+  <div class="sub">// Практична 10.1 · Варіант 1 · Promise Chains</div>
+</header>
+
+<div class="container">
+
+  <!-- Order form -->
+  <div class="order-card">
+    <div class="order-title"><span class="icon">🍕</span> Нове замовлення</div>
+    <div class="field-row">
+      <div>
+        <label>ID замовлення</label>
+        <input type="text" id="order-id" value="ORD-001" placeholder="ORD-001">
+      </div>
+      <button class="btn btn-primary" id="start-btn">▶ Оформити замовлення</button>
+      <button class="btn btn-ghost" id="reset-btn">↺ Скинути</button>
+      <span class="timer" id="timer"></span>
+    </div>
+    <div style="font-size:.78rem;color:var(--muted);font-family:var(--mono)">
+      // 20% шанс помилки на кожному етапі · якщо помилка — натисни ще раз
+    </div>
+  </div>
+
+  <!-- Result banner -->
+  <div class="result-banner" id="result-banner">
+    <div class="result-title" id="result-title"></div>
+    <div class="result-detail" id="result-detail"></div>
+  </div>
+
+  <!-- Pipeline steps -->
+  <div class="pipeline" id="pipeline">
+
+    <div class="step" id="step-check">
+      <div class="step-icon">🔍</div>
+      <div class="step-body">
+        <div class="step-name">checkAvailability()</div>
+        <div class="step-desc">Перевірка наявності товарів · затримка 1с</div>
+      </div>
+      <span class="step-status status-wait" id="s-check">очікування</span>
+    </div>
+
+    <div class="connector" id="conn-1"></div>
+
+    <div class="step" id="step-reserve">
+      <div class="step-icon">📦</div>
+      <div class="step-body">
+        <div class="step-name">reserveItems()</div>
+        <div class="step-desc">Резервування товарів · затримка 1с</div>
+      </div>
+      <span class="step-status status-wait" id="s-reserve">очікування</span>
+    </div>
+
+    <div class="connector" id="conn-2"></div>
+
+    <div class="step" id="step-pay">
+      <div class="step-icon">💳</div>
+      <div class="step-body">
+        <div class="step-name">processPayment()</div>
+        <div class="step-desc">Обробка оплати · затримка 1.5с</div>
+      </div>
+      <span class="step-status status-wait" id="s-pay">очікування</span>
+    </div>
+
+    <div class="connector" id="conn-3"></div>
+
+    <div class="step" id="step-deliver">
+      <div class="step-icon">🛵</div>
+      <div class="step-body">
+        <div class="step-name">scheduleDelivery()</div>
+        <div class="step-desc">Планування доставки · затримка 1с</div>
+      </div>
+      <span class="step-status status-wait" id="s-deliver">очікування</span>
+    </div>
+
+  </div>
+
+  <!-- Log -->
+  <div class="log-card">
+    <div class="log-header">
+      <span class="log-title">📋 Лог виконання</span>
+      <button class="btn btn-ghost" id="clear-log" style="padding:4px 12px;font-size:.74rem;">очистити</button>
+    </div>
+    <div class="log-body" id="log"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Вбудована логіка ──────────────────────────────────────────
+
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+const shouldFail = stage => {
+  if (Math.random() < 0.2)
+    throw new Error(`[${stage}] Помилка сервісу — спробуйте ще раз`);
+};
+
+function checkAvailability(orderId) {
+  return new Promise((resolve, reject) => {
+    delay(1000).then(() => {
+      try {
+        shouldFail('checkAvailability');
+        resolve({ orderId, items: ['Піца Маргарита', 'Coca-Cola', 'Тірамісу'], amount: 485 });
+      } catch(e) { reject(e); }
+    });
+  });
+}
+
+function reserveItems(data) {
+  return new Promise((resolve, reject) => {
+    delay(1000).then(() => {
+      try {
+        shouldFail('reserveItems');
+        resolve({ ...data, reservedAt: now() });
+      } catch(e) { reject(e); }
+    });
+  });
+}
+
+function processPayment(data) {
+  return new Promise((resolve, reject) => {
+    delay(1500).then(() => {
+      try {
+        shouldFail('processPayment');
+        resolve({
+          ...data,
+          transactionId: 'TXN-' + Math.random().toString(36).slice(2,10).toUpperCase(),
+          paidAt: now(),
+        });
+      } catch(e) { reject(e); }
+    });
+  });
+}
+
+function scheduleDelivery(data) {
+  return new Promise((resolve, reject) => {
+    delay(1000).then(() => {
+      try {
+        shouldFail('scheduleDelivery');
+        const eta = new Date(Date.now() + 30*60*1000)
+          .toLocaleTimeString('uk-UA', { hour:'2-digit', minute:'2-digit' });
+        resolve({ ...data, courier: 'Олег К.', eta });
+      } catch(e) { reject(e); }
+    });
+  });
+}
+
+// ── UI helpers ────────────────────────────────────────────────
+
+const now = () => new Date().toLocaleTimeString('uk-UA', { hour12: false });
+
+const log = (msg, type = 'info') => {
+  const body = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = `log-line log-${type}`;
+  line.innerHTML = `<span class="log-time">${now()}</span><span class="log-msg">${msg}</span>`;
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+};
+
+const setStep = (id, statusId, connId, state, statusText) => {
+  const step = document.getElementById(id);
+  const badge = document.getElementById(statusId);
+  step.className = `step ${state}`;
+  badge.className = `step-status status-${state === 'active' ? 'loading' : state === 'success' ? 'ok' : state === 'error' ? 'fail' : 'wait'}`;
+  badge.textContent = statusText;
+  if (connId && state === 'success') {
+    document.getElementById(connId).classList.add('done');
+  }
+};
+
+const resetSteps = () => {
+  ['check','reserve','pay','deliver'].forEach(id => {
+    document.getElementById(`step-${id}`).className = 'step';
+    const b = document.getElementById(`s-${id}`);
+    b.className = 'step-status status-wait';
+    b.textContent = 'очікування';
+  });
+  ['conn-1','conn-2','conn-3'].forEach(id => {
+    document.getElementById(id).classList.remove('done');
+  });
+  const banner = document.getElementById('result-banner');
+  banner.className = 'result-banner';
+};
+
+const showResult = (success, title, detail) => {
+  const banner = document.getElementById('result-banner');
+  banner.className = `result-banner show ${success ? 'success' : 'error'}`;
+  const t = document.getElementById('result-title');
+  t.className = `result-title ${success ? 'success' : 'error'}`;
+  t.textContent = title;
+  document.getElementById('result-detail').textContent = detail;
+};
+
+// ── Timer ─────────────────────────────────────────────────────
+
+let timerInterval = null;
+const startTimer = () => {
+  const t0 = Date.now();
+  const el = document.getElementById('timer');
+  timerInterval = setInterval(() => {
+    el.textContent = `⏱ ${((Date.now()-t0)/1000).toFixed(1)}с`;
+  }, 100);
+  return t0;
+};
+const stopTimer = (t0) => {
+  clearInterval(timerInterval);
+  return ((Date.now()-t0)/1000).toFixed(2);
+};
+
+// ── Main ──────────────────────────────────────────────────────
+
+let running = false;
+
+document.getElementById('start-btn').onclick = () => {
+  if (running) return;
+  running = true;
+
+  const orderId = document.getElementById('order-id').value.trim() || 'ORD-001';
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true;
+
+  resetSteps();
+  document.getElementById('result-banner').className = 'result-banner';
+
+  log(`━━━ Замовлення ${orderId} ━━━`, 'info');
+  log('Запуск ланцюжка промісів...', 'info');
+
+  const t0 = startTimer();
+
+  // ── Promise chain ──────────────────────────────────────────
+  setStep('step-check', 's-check', null, 'active', 'виконується...');
+  log('→ checkAvailability() — перевірка наявності', 'info');
+
+  checkAvailability(orderId)
+
+    .then(result => {
+      setStep('step-check', 's-check', 'conn-1', 'success', '✓ готово');
+      log(`✓ Наявність підтверджена: ${result.items.join(', ')} · сума: ${result.amount} грн`, 'success');
+
+      setStep('step-reserve', 's-reserve', null, 'active', 'виконується...');
+      log('→ reserveItems() — резервування', 'info');
+      return reserveItems(result);
+    })
+
+    .then(result => {
+      setStep('step-reserve', 's-reserve', 'conn-2', 'success', '✓ готово');
+      log(`✓ Зарезервовано о ${result.reservedAt}`, 'success');
+
+      setStep('step-pay', 's-pay', null, 'active', 'виконується...');
+      log('→ processPayment() — оплата 💳', 'info');
+      return processPayment(result);
+    })
+
+    .then(result => {
+      setStep('step-pay', 's-pay', 'conn-3', 'success', '✓ готово');
+      log(`✓ Оплата прийнята · транзакція: ${result.transactionId}`, 'success');
+
+      setStep('step-deliver', 's-deliver', null, 'active', 'виконується...');
+      log('→ scheduleDelivery() — планування доставки', 'info');
+      return scheduleDelivery(result);
+    })
+
+    .then(result => {
+      setStep('step-deliver', 's-deliver', null, 'success', '✓ готово');
+      const elapsed = stopTimer(t0);
+      log(`✓ Доставку заплановано · кур'єр: ${result.courier} · ETA: ${result.eta}`, 'success');
+      log(`━━━ Замовлення успішно оформлено за ${elapsed}с ━━━`, 'success');
+      showResult(true, '✅ Замовлення оформлено!',
+        `Замовлення: ${result.orderId}\nТовари: ${result.items.join(', ')}\nСума: ${result.amount} грн\nТранзакція: ${result.transactionId}\nКур'єр: ${result.courier}\nЧас доставки: ${result.eta}\nЗагальний час обробки: ${elapsed}с`
+      );
+    })
+
+    // Централізована обробка помилок
+    .catch(err => {
+      stopTimer(t0);
+      // Позначаємо поточний активний крок як помилковий
+      ['check','reserve','pay','deliver'].forEach(id => {
+        const step = document.getElementById(`step-${id}`);
+        if (step.classList.contains('active')) {
+          setStep(`step-${id}`, `s-${id}`, null, 'error', '✗ помилка');
+        }
+      });
+      log(`✗ ПОМИЛКА: ${err.message}`, 'error');
+      log('Ланцюжок промісів перервано', 'warn');
+      showResult(false, '❌ Помилка при оформленні', err.message + '\n\nНатисни "Оформити замовлення" щоб спробувати ще раз.');
+    })
+
+    // Завжди виконується
+    .finally(() => {
+      log('── finally() — очищення стану ──', 'finally');
+      running = false;
+      btn.disabled = false;
+    });
+};
+
+document.getElementById('reset-btn').onclick = () => {
+  resetSteps();
+  document.getElementById('result-banner').className = 'result-banner';
+  document.getElementById('timer').textContent = '';
+  document.getElementById('order-id').value = 'ORD-' + String(Math.floor(Math.random()*900)+100);
+};
+
+document.getElementById('clear-log').onclick = () => {
+  document.getElementById('log').innerHTML = '';
+};
+</script>
+</body>
+</html>
