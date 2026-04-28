@@ -86,7 +86,7 @@ checkAvailability(orderId)
 
 ## Demo відео
 
-> 📹 [Посилання на відео-демонстрацію](#)
+> https://github.com/imenshov-ctrl/js-promises-variant1/blob/main/FoodOrder%20%E2%80%94%20Promise%20Chains%20Demo%20-%20Google%20Chrome%202026-04-28%2020-13-48.mp4
 
 ---
 
